@@ -25,7 +25,6 @@ from urllib.parse import quote
 # -------------------- Paths & config --------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_DIR = Path(os.environ.get("VOCAB_REPO", SCRIPT_DIR))
-TSV_FILE = REPO_DIR / "vocab_sv.tsv"
 
 PREFERRED_PLAYERS = [
     os.environ.get("MP3_PLAYER"),
@@ -179,11 +178,11 @@ def ensure_repo():
     if not (REPO_DIR / ".git").exists():
         sh(f'git -C "{REPO_DIR}" init', check=False)
 
-def append_tsv(word, en_text, zh_text):
+def append_tsv(tsv_path: Path, word: str, en_text: str, zh_text: str):
     ensure_repo()
-    TSV_FILE.touch(exist_ok=True)
+    tsv_path.touch(exist_ok=True)
     line = f"{word}\t{en_text}\t{zh_text}\n"
-    with TSV_FILE.open("a", encoding="utf-8") as f:
+    with tsv_path.open("a", encoding="utf-8") as f:
         f.write(line)
     return line
 
@@ -196,12 +195,23 @@ def has_remote():
 
 def git_commit_push(message):
     try:
-        sh(f'git -C "{REPO_DIR}" add "{TSV_FILE.name}"', check=False, quiet=True)
+        sh(f'git -C "{REPO_DIR}" add "{tsv_path.name}"', check=False, quiet=True)
         sh(f'git -C "{REPO_DIR}" commit -m "{message}"', check=False, quiet=True)
         if AUTO_PUSH and has_remote():
             sh(f'git -C "{REPO_DIR}" push', check=False)
     except Exception:
         pass
+
+def tsv_path_for_lang(lang_code: str) -> Path:
+    """
+    Determine TSV path based on source language code.
+    Unknown languages will still map to vocab_<code>.tsv
+    """
+    code = (lang_code or "en").lower()
+    if len(code) > 2:  # normalize like 'zh-cn' -> 'zh'
+        code = code.split("-")[0]
+    fname = f"vocab_{code}.tsv"
+    return REPO_DIR / fname
 
 # -------------------- main --------------------
 def main():
@@ -218,6 +228,8 @@ def main():
     if lang == "auto":
         lang = detect_lang_auto(term)
 
+    tsv_path = tsv_path_for_lang(lang)
+
     en_text, zh_text, audio_url = "", "", None
 
     if lang == "en":
@@ -230,19 +242,18 @@ def main():
         en_text = trans_brief("sv", "en", term) or ""
         zh_text = trans_brief("sv", "zh-CN", term) or ""
         play_audio(term, "sv", audio_url=None, enable=not args.no_audio)
-
     else:
         # generic: translate to EN + ZH and speak in EN
         en_text = trans_brief(lang, "en", term) or ""
         zh_text = trans_brief(lang, "zh-CN", term) or ""
         play_audio(term, "en", audio_url=None, enable=not args.no_audio)
 
-    saved = append_tsv(term, en_text, zh_text)
+    saved = append_tsv(tsv_path, term, en_text, zh_text)
     git_commit_push(f"add {term}")
 
     print("Saved (TSV):")
     print(saved, end="")
-    print(f"\nFile: {TSV_FILE}")
+    print(f"\nFile: {tsv_path}")
     if AUTO_PUSH and not has_remote():
         print("\n[hint] No git remote set. Add one:\n"
               f'  git -C "{REPO_DIR}" remote add origin <YOUR_GITHUB_URL>\n'
