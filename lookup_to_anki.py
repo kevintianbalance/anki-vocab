@@ -11,7 +11,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 # ---------- Configuration ----------
-REPO_DIR = Path(os.environ.get("VOCAB_REPO", str(Path.home() / "anki-vocab")))
+# Find the directory where this script itself lives
+SCRIPT_DIR = Path(__file__).resolve().parent
+# Use the folder "anki-vocab" that sits next to the script
+REPO_DIR = Path(os.environ.get("VOCAB_REPO", SCRIPT_DIR))
+
 TSV_FILE = REPO_DIR / "vocab.tsv"
 
 # Audio selection order; can be overridden by env MP3_PLAYER
