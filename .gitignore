@@ -1,0 +1,244 @@
+# ----------------------------------------
+# Operating System
+# ----------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+
+# ----------------------------------------
+# IDEs / Editors
+# ----------------------------------------
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains (IntelliJ, PyCharm, WebStorm, etc.)
+.idea/
+*.iml
+out/
+
+# Eclipse
+.project
+.metadata/
+*.tmp
+*.bak
+*.swp
+.buildpath
+.settings/
+
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+*.orig
+*.deleteme
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*.vimrc.swp
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ----------------------------------------
+# Language / Platform
+# ----------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+env.bak/
+pip-log.txt
+htmlcov/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+
+# Node.js / JavaScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-store/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+target/
+build/
+out/
+
+# Go
+bin/
+obj/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# PHP
+vendor/
+composer.lock
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+
+# Rust
+/target/
+/**/*.rs.bk
+
+# C / C++
+*.o
+*.obj
+*.so
+*.exe
+*.dll
+*.out
+/build/
+/cmake-build-*/
+
+# Swift / Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Android / Gradle
+.gradle/
+/local.properties
+/.idea/
+/build/
+/captures/
+/.externalNativeBuild/
+
+# ----------------------------------------
+# Document & Markup
+# ----------------------------------------
+# LaTeX
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.fdb_latexmk
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.pdf
+*.ps
+
+# Markdown / Docs
+*.pdf
+*.docx
+*.pptx
+*.xlsx
+
+# Sphinx
+_build/
+Thumbs.db
+._*
+
+# ----------------------------------------
+# Miscellaneous
+# ----------------------------------------
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Certificates
+*.pem
+*.crt
+*.key
+
+# Temporary files
+*.tmp
+*.temp
+
+# Lock files
+npm-debug.log*
+yarn-debug.log*
+package-lock.json
+yarn.lock
+
+# End of generic .gitignore
