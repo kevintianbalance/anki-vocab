@@ -204,51 +204,104 @@ def english_defs_from_dictionaryapi(word):
         return None, [f"(dictapi error: {e})"]
 
 def swedish_defs_with_examples(word):
-    """Get Swedish definitions with examples from Folkets lexikon API"""
+    """Get Swedish definitions with examples from multiple sources"""
+    
+    # Try Wiktionary API first (most comprehensive)
     try:
-        # Try Folkets lexikon API (Swedish-English dictionary with examples)
+        url = f"https://en.wiktionary.org/api/rest_v1/page/definition/{quote(word)}"
+        data = fetch_json(url)
+        
+        defs = []
+        if isinstance(data, dict):
+            # Look for Swedish section
+            for lang_key in ["Swedish", "sv"]:
+                if lang_key in data:
+                    for entry in data[lang_key][:2]:  # Limit to 2 entries
+                        part = entry.get("partOfSpeech", "word")
+                        for definition in entry.get("definitions", []):
+                            def_text = definition.get("definition", "")
+                            examples = definition.get("examples", [])
+                            
+                            if def_text:
+                                # Clean HTML tags
+                                import re
+                                def_text = re.sub(r'<[^>]+>', '', def_text)
+                                short = f"[{part}] {def_text}"
+                                
+                                if examples and examples[0]:
+                                    example = re.sub(r'<[^>]+>', '', examples[0])
+                                    short += f" (e.g. {example})"
+                                
+                                defs.append(short)
+                                break  # One definition per part of speech
+                    break
+        
+        if defs:
+            return defs
+    except Exception:
+        pass
+    
+    # Try Folkets lexikon as backup
+    try:
         url = f"https://folkets-lexikon.csc.kth.se/folkets/service?word={quote(word)}&lang=sv&output=json"
         data = fetch_json(url)
         
         defs = []
-        if isinstance(data, list):
-            for entry in data[:3]:  # Limit to 3 entries
+        if isinstance(data, list) and data:
+            for entry in data[:2]:  # Limit to 2 entries
                 if isinstance(entry, dict):
                     word_class = entry.get("class", "word")
                     translation = entry.get("translation", "")
-                    example = entry.get("example", "")
                     
                     if translation:
                         short = f"[{word_class}] {translation}"
-                        if example:
-                            short += f" (e.g. {example})"
                         defs.append(short)
         
         if defs:
             return defs
-            
     except Exception:
         pass
     
-    # Fallback: Try to create enhanced translation with context
+    # Enhanced fallback with common Swedish example patterns
     try:
         en_trans = trans_brief("sv", "en", word)
         if en_trans:
-            # Create a simple example sentence
-            example_sentences = {
-                "detalj": "Varje detalj är viktig",
-                "eller": "Kaffe eller te?",
-                "och": "Jag och du",
-                "men": "Jag vill, men jag kan inte",
-                "att": "Jag vill att du kommer"
+            # Common Swedish example patterns based on word type
+            example_patterns = {
+                # Nouns
+                "detalj": "Varje detalj är viktig (Every detail is important)",
+                "hus": "Ett stort hus (A big house)",
+                "bil": "Min bil är röd (My car is red)",
+                "bok": "Jag läser en bok (I'm reading a book)",
+                
+                # Conjunctions
+                "eller": "Kaffe eller te? (Coffee or tea?)",
+                "och": "Jag och du (You and I)",
+                "men": "Jag vill, men jag kan inte (I want to, but I can't)",
+                
+                # Verbs
+                "att": "Jag vill att du kommer (I want you to come)",
+                "är": "Det är bra (It is good)",
+                "har": "Jag har en katt (I have a cat)",
+                
+                # Adjectives
+                "stor": "En stor hund (A big dog)",
+                "liten": "Ett litet barn (A small child)",
+                "bra": "Det är mycket bra (It's very good)"
             }
             
-            example = example_sentences.get(word.lower(), f"Här är {word} i en mening")
-            return [f"[word] {en_trans} (e.g. {example})"]
+            example = example_patterns.get(word.lower())
+            if example:
+                return [f"[word] {en_trans} (e.g. {example})"]
+            else:
+                # Generic example
+                return [f"[word] {en_trans} (e.g. Jag använder '{word}' i svenska (I use '{word}' in Swedish))"]
     except Exception:
         pass
     
-    return [trans_brief("sv", "en", word) or "(no translation found)"]
+    # Final fallback
+    basic_trans = trans_brief("sv", "en", word)
+    return [basic_trans] if basic_trans else ["(no translation found)"]
 
 # -------------------- audio --------------------
 def pick_player():
@@ -354,7 +407,19 @@ def main():
         sv_defs = swedish_defs_with_examples(term)
         en_text = " ; ".join(sv_defs) if sv_defs else ""
         zh_text = trans_brief("sv", "zh-CN", term) or ""
-        play_audio(term, "sv", audio_url=None, enable=not args.no_audio)
+        # Try to get Swedish audio from Forvo API
+        forvo_api_key = os.environ.get("FORVO_API_KEY")
+        if forvo_api_key:
+          try:
+              forvo_url = f"https://apifree.forvo.com/action/word-pronunciations/format/json/word/{quote(term)}/language/sv/key/{forvo_api_key}"
+              forvo_data = fetch_json(forvo_url)
+              if forvo_data.get("items"):
+                  audio_url = forvo_data["items"][0].get("pathmp3")
+          except Exception:
+              pass
+          play_audio(term, "sv", audio_url=audio_url, enable=not args.no_audio)
+        else:
+            play_audio(term, "sv", audio_url=None, enable=not args.no_audio)
     else:
         # generic: translate to EN + ZH and speak in EN
         en_text = trans_brief(lang, "en", term) or ""
