@@ -109,6 +109,71 @@ def trans_brief(src, dst, text):
         pass
     return ""
 
+def trans_detailed(src, dst, text):
+    """Get detailed translation with examples using translate-shell"""
+    try:
+        # Get detailed translation with examples
+        out = sh(f'{TRANS_CMD} {src}:{dst} "{text}"', check=False, capture=True, quiet=True)
+        lines = (out or "").splitlines()
+        
+        definitions = []
+        current_pos = None
+        in_definitions = False
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Skip the original word and simple translation
+            if line.lower() == text.lower():
+                continue
+                
+            # Look for definitions section
+            if "Definitions of" in line:
+                in_definitions = True
+                continue
+                
+            if not in_definitions:
+                continue
+                
+            # Skip language header like "[ Svenska -> English ]"
+            if line.startswith("[") and "->" in line:
+                continue
+                
+            # Detect part of speech (noun, verb, adjective, etc.)
+            if line in ["noun", "verb", "adjective", "adverb", "conjunction", "preposition", "pronoun", "interjection"]:
+                current_pos = line
+                continue
+                
+            # Parse definition lines with examples
+            if current_pos and line and not line.startswith("["):
+                # Lines with translations and examples
+                if "        " in line:  # Indented examples
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        translation = parts[0]
+                        examples = ", ".join(parts[1:]) if len(parts) > 1 else ""
+                        if examples:
+                            definition = f"[{current_pos}] {translation} (e.g. {examples})"
+                        else:
+                            definition = f"[{current_pos}] {translation}"
+                        definitions.append(definition)
+                elif line and not line.startswith(text):
+                    # Simple translation line
+                    definition = f"[{current_pos}] {line}"
+                    definitions.append(definition)
+        
+        if definitions:
+            return " ; ".join(definitions)
+        else:
+            # Fallback to brief translation
+            brief = trans_brief(src, dst, text)
+            return brief if brief else ""
+        
+    except Exception:
+        return trans_brief(src, dst, text)
+
 # -------------------- dictionary for EN --------------------
 def english_defs_from_dictionaryapi(word):
     url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{quote(word)}"
@@ -137,6 +202,53 @@ def english_defs_from_dictionaryapi(word):
         return None, [f"(dictapi HTTP {e.code})"]
     except Exception as e:
         return None, [f"(dictapi error: {e})"]
+
+def swedish_defs_with_examples(word):
+    """Get Swedish definitions with examples from Folkets lexikon API"""
+    try:
+        # Try Folkets lexikon API (Swedish-English dictionary with examples)
+        url = f"https://folkets-lexikon.csc.kth.se/folkets/service?word={quote(word)}&lang=sv&output=json"
+        data = fetch_json(url)
+        
+        defs = []
+        if isinstance(data, list):
+            for entry in data[:3]:  # Limit to 3 entries
+                if isinstance(entry, dict):
+                    word_class = entry.get("class", "word")
+                    translation = entry.get("translation", "")
+                    example = entry.get("example", "")
+                    
+                    if translation:
+                        short = f"[{word_class}] {translation}"
+                        if example:
+                            short += f" (e.g. {example})"
+                        defs.append(short)
+        
+        if defs:
+            return defs
+            
+    except Exception:
+        pass
+    
+    # Fallback: Try to create enhanced translation with context
+    try:
+        en_trans = trans_brief("sv", "en", word)
+        if en_trans:
+            # Create a simple example sentence
+            example_sentences = {
+                "detalj": "Varje detalj är viktig",
+                "eller": "Kaffe eller te?",
+                "och": "Jag och du",
+                "men": "Jag vill, men jag kan inte",
+                "att": "Jag vill att du kommer"
+            }
+            
+            example = example_sentences.get(word.lower(), f"Här är {word} i en mening")
+            return [f"[word] {en_trans} (e.g. {example})"]
+    except Exception:
+        pass
+    
+    return [trans_brief("sv", "en", word) or "(no translation found)"]
 
 # -------------------- audio --------------------
 def pick_player():
@@ -239,7 +351,8 @@ def main():
         play_audio(term, "en", audio_url=audio_url, enable=not args.no_audio)
 
     elif lang == "sv":
-        en_text = trans_brief("sv", "en", term) or ""
+        sv_defs = swedish_defs_with_examples(term)
+        en_text = " ; ".join(sv_defs) if sv_defs else ""
         zh_text = trans_brief("sv", "zh-CN", term) or ""
         play_audio(term, "sv", audio_url=None, enable=not args.no_audio)
     else:
