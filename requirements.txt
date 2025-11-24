@@ -1,10 +1,10 @@
 # === Core dependencies ===
 langdetect==1.0.9       # for detecting the language of input text
 gTTS==2.5.3              # for generating speech via Google TTS (optional if you prefer espeak-ng)
-playsound==1.3.0         # for playing audio files
+# playsound==1.3.0         # for playing audio files
 requests==2.32.3         # for any web requests or API use
 beautifulsoup4==4.12.3   # if you parse HTML (e.g. dictionary lookups)
-lxml==5.2.1              # fast HTML/XML parser backend
+# lxml==5.2.1              # fast HTML/XML parser backend
 gitpython==3.1.43        # if your script auto-commits to git
 
 # If you use espeak-ng from the system (installed via apt), you don’t need to list it here — it’s not a Python package.
