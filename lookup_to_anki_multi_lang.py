@@ -401,8 +401,19 @@ def main():
         audio_url, en_defs = english_defs_from_dictionaryapi(term)
         en_text = " ; ".join(en_defs) if en_defs else ""
         zh_text = trans_brief("en", "zh-CN", term) or ""
-        play_audio(term, "en", audio_url=audio_url, enable=not args.no_audio)
-
+        # Try to get Swedish audio from Forvo API
+        forvo_api_key = os.environ.get("FORVO_API_KEY")
+        if forvo_api_key:
+          try:
+              forvo_url = f"https://apifree.forvo.com/action/word-pronunciations/format/json/word/{quote(term)}/language/sv/key/{forvo_api_key}"
+              forvo_data = fetch_json(forvo_url)
+              if forvo_data.get("items"):
+                  audio_url = forvo_data["items"][0].get("pathmp3")
+          except Exception:
+              pass
+          play_audio(term, "en", audio_url=audio_url, enable=not args.no_audio)
+        else:
+            play_audio(term, "en", audio_url=audio_url, enable=not args.no_audio)
     elif lang == "sv":
         sv_defs = swedish_defs_with_examples(term)
         en_text = " ; ".join(sv_defs) if sv_defs else ""
