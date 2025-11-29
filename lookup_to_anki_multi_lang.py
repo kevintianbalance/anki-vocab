@@ -421,9 +421,31 @@ def ensure_repo():
     if not (REPO_DIR / ".git").exists():
         sh(f'git -C "{REPO_DIR}" init', check=False)
 
+def word_exists_in_tsv(tsv_path: Path, word: str) -> bool:
+    """Check if word already exists as first column in TSV file"""
+    if not tsv_path.exists():
+        return False
+    
+    try:
+        with tsv_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    first_column = line.split("\t")[0].strip()
+                    if first_column.lower() == word.lower():
+                        return True
+    except Exception:
+        pass
+    return False
+
 def append_tsv(tsv_path: Path, word: str, en_text: str, zh_text: str):
     ensure_repo()
     tsv_path.touch(exist_ok=True)
+    
+    # Check if word already exists
+    if word_exists_in_tsv(tsv_path, word):
+        return f"Word '{word}' already exists in {tsv_path.name}\n"
+    
     line = f"{word}\t{en_text}\t{zh_text}\n"
     with tsv_path.open("a", encoding="utf-8") as f:
         f.write(line)
@@ -559,10 +581,16 @@ def main():
         play_audio(term, "en", audio_url=None, enable=not args.no_audio)
 
     saved = append_tsv(tsv_path, term, en_text, zh_text)
-    git_commit_push(f"add {term}")
-
-    print("Saved (TSV):")
-    print(saved, end="")
+    
+    # Only commit if word was actually added (not a duplicate)
+    if not saved.startswith("Word '"):
+        git_commit_push(f"add {term}")
+        print("Saved (TSV):")
+        print(saved, end="")
+    else:
+        print("Skipped (duplicate):")
+        print(saved, end="")
+    
     print(f"\nFile: {tsv_path}")
     if AUTO_PUSH and not has_remote():
         print("\n[hint] No git remote set. Add one:\n"
