@@ -303,6 +303,84 @@ def swedish_defs_with_examples(word):
     basic_trans = trans_brief("sv", "en", word)
     return [basic_trans] if basic_trans else ["(no translation found)"]
 
+def english_to_swedish_with_examples(word):
+    """Translate English to Swedish with examples and context"""
+    
+    # Try Folkets lexikon for English to Swedish
+    try:
+        url = f"https://folkets-lexikon.csc.kth.se/folkets/service?word={quote(word)}&lang=en&output=json"
+        data = fetch_json(url)
+        
+        translations = []
+        if isinstance(data, list) and data:
+            for entry in data[:2]:  # Limit to 2 entries
+                if isinstance(entry, dict):
+                    word_class = entry.get("class", "word")
+                    translation = entry.get("translation", "")
+                    
+                    if translation:
+                        # Create Swedish example sentence
+                        sv_examples = {
+                            "house": f"{translation} - Ett stort {translation} (A big house)",
+                            "car": f"{translation} - Min {translation} är röd (My car is red)",
+                            "book": f"{translation} - Jag läser en {translation} (I'm reading a book)",
+                            "water": f"{translation} - Jag dricker {translation} (I drink water)",
+                            "food": f"{translation} - Maten är god (The food is good)",
+                            "good": f"{translation} - Det är mycket {translation} (It's very good)",
+                            "big": f"{translation} - En {translation} hund (A big dog)",
+                            "small": f"{translation} - Ett {translation} barn (A small child)",
+                            "love": f"{translation} - Jag {translation} dig (I love you)",
+                            "have": f"{translation} - Jag {translation} en katt (I have a cat)",
+                            "want": f"{translation} - Jag {translation} kaffe (I want coffee)",
+                            "go": f"{translation} - Jag ska {translation} hem (I'm going home)",
+                            "come": f"{translation} - Kan du {translation}? (Can you come?)",
+                            "see": f"{translation} - Jag kan {translation} dig (I can see you)",
+                            "know": f"{translation} - Jag {translation} inte (I don't know)"
+                        }
+                        
+                        example = sv_examples.get(word.lower())
+                        if example:
+                            translations.append(f"[{word_class}] {example}")
+                        else:
+                            # Generic example
+                            translations.append(f"[{word_class}] {translation} (e.g. Jag använder '{translation}' på svenska)")
+        
+        if translations:
+            return translations
+    except Exception:
+        pass
+    
+    # Fallback: Use trans command with enhanced examples
+    try:
+        sv_trans = trans_brief("en", "sv", word)
+        if sv_trans:
+            # Common English to Swedish example patterns
+            example_patterns = {
+                "hello": f"{sv_trans} - {sv_trans}, hur mår du? (Hello, how are you?)",
+                "thank": f"{sv_trans} - {sv_trans} så mycket (Thank you so much)",
+                "please": f"{sv_trans} - Kan du hjälpa mig, {sv_trans}? (Can you help me, please?)",
+                "yes": f"{sv_trans} - {sv_trans}, det stämmer (Yes, that's right)",
+                "no": f"{sv_trans} - {sv_trans}, det gör jag inte (No, I don't)",
+                "time": f"{sv_trans} - Vad är klockan? Vilken {sv_trans} är det? (What time is it?)",
+                "day": f"{sv_trans} - Idag är en bra {sv_trans} (Today is a good day)",
+                "night": f"{sv_trans} - God {sv_trans}! (Good night!)",
+                "morning": f"{sv_trans} - God {sv_trans}! (Good morning!)",
+                "work": f"{sv_trans} - Jag går till {sv_trans} (I'm going to work)"
+            }
+            
+            example = example_patterns.get(word.lower())
+            if example:
+                return [f"[word] {example}"]
+            else:
+                # Generic Swedish example
+                return [f"[word] {sv_trans} (e.g. Jag lär mig svenska ord som '{sv_trans}')"]
+    except Exception:
+        pass
+    
+    # Final fallback
+    basic_trans = trans_brief("en", "sv", word)
+    return [basic_trans] if basic_trans else ["(no translation found)"]
+
 # -------------------- audio --------------------
 def pick_player():
     for p in PREFERRED_PLAYERS:
@@ -383,7 +461,7 @@ def main():
     ap = argparse.ArgumentParser(description="Lookup word/phrase and append to Anki TSV")
     ap.add_argument("term", nargs="+", help="Word or phrase")
     ap.add_argument("--lang", "-l", default="auto",
-                    help="Source language code (e.g., auto|en|sv|zh|de|fr). Default: auto")
+                    help="Source language code (e.g., auto|en|sv|en2sv|zh|de|fr). Use 'en2sv' to translate English to Swedish. Default: auto")
     ap.add_argument("--no-audio", action="store_true", help="Disable audio playback")
     args = ap.parse_args()
 
@@ -431,6 +509,49 @@ def main():
           play_audio(term, "sv", audio_url=audio_url, enable=not args.no_audio)
         else:
             play_audio(term, "sv", audio_url=None, enable=not args.no_audio)
+            
+    elif lang == "en2sv":
+        # Special mode: English to Swedish, save to vocab_sv.tsv with Swedish<tab>English<tab>Chinese
+        sv_translations = english_to_swedish_with_examples(term)
+        
+        # Extract the Swedish word from the translation
+        sv_word = ""
+        if sv_translations:
+            # Parse the translation to get the Swedish word
+            first_trans = sv_translations[0]
+            if "] " in first_trans:
+                after_bracket = first_trans.split("] ", 1)[1]
+                if " - " in after_bracket:
+                    sv_word = after_bracket.split(" - ")[0].strip()
+                elif " (" in after_bracket:
+                    sv_word = after_bracket.split(" (")[0].strip()
+                else:
+                    sv_word = after_bracket.strip()
+        
+        if not sv_word:
+            sv_word = trans_brief("en", "sv", term) or term
+        
+        # Use the full translation with examples as English explanation
+        en_text = " ; ".join(sv_translations) if sv_translations else ""
+        zh_text = trans_brief("en", "zh-CN", term) or ""
+        
+        # Override the term to be the Swedish word for TSV and force Swedish TSV
+        term = sv_word
+        tsv_path = tsv_path_for_lang("sv")
+        
+        # Play Swedish pronunciation
+        forvo_api_key = os.environ.get("FORVO_API_KEY")
+        if forvo_api_key:
+          try:
+              forvo_url = f"https://apifree.forvo.com/action/word-pronunciations/format/json/word/{quote(sv_word)}/language/sv/key/{forvo_api_key}"
+              forvo_data = fetch_json(forvo_url)
+              if forvo_data.get("items"):
+                  audio_url = forvo_data["items"][0].get("pathmp3")
+          except Exception:
+              pass
+          play_audio(sv_word, "sv", audio_url=audio_url, enable=not args.no_audio)
+        else:
+            play_audio(sv_word, "sv", audio_url=None, enable=not args.no_audio)
     else:
         # generic: translate to EN + ZH and speak in EN
         en_text = trans_brief(lang, "en", term) or ""
