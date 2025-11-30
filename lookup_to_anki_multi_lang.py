@@ -68,8 +68,78 @@ def sh(cmd, check=True, capture=False, quiet=False):
 
 def fetch_json(url, timeout=HTTP_TIMEOUT):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8", errors="ignore"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            content = resp.read().decode("utf-8", errors="ignore")
+            if not content.strip():
+                return None
+            # Check if content is HTML (starts with < or <!)
+            if content.strip().startswith("<"):
+                return None
+            return json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    except Exception:
+        return None
+
+def fetch_folkets_lexikon(word, lang="en"):
+    """Fetch and parse Folkets lexikon HTML response"""
+    url = f"https://folkets-lexikon.csc.kth.se/folkets/service?word={quote(word)}&lang={lang}&output=json"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            content = resp.read().decode("utf-8", errors="ignore")
+            
+        import re
+        translations = []
+        
+        # Extract content within <P></P> tags
+        p_matches = re.findall(r'<P>(.*?)</P>', content, re.DOTALL | re.IGNORECASE)
+        
+        for p_content in p_matches[:2]:  # Limit to first 2 entries
+            # Extract the main translation word (in <b> tags after the target language flag)
+            if lang == "en":
+                # Looking for Swedish word when translating from English
+                sv_word_match = re.search(r'flag_18x12_sv\.png[^>]*>\s*<b>([^<]+)</b>', p_content)
+                if sv_word_match:
+                    translation = sv_word_match.group(1).strip()
+                    
+                    # Extract word class (verb, noun, etc.)
+                    word_class_match = re.search(r'</b>\s+(\w+)', p_content)
+                    word_class = word_class_match.group(1) if word_class_match else "word"
+                    
+                    # Extract examples
+                    examples = []
+                    example_matches = re.findall(r'Exempel:\s*([^<]+(?:<br>)?)', p_content)
+                    if example_matches:
+                        for ex in example_matches:
+                            ex_clean = re.sub(r'<[^>]+>', '', ex).strip()
+                            if ex_clean:
+                                examples.append(ex_clean)
+                    
+                    translations.append({
+                        "translation": translation,
+                        "class": word_class,
+                        "examples": examples
+                    })
+            else:
+                # Looking for English word when translating from Swedish
+                en_word_match = re.search(r'flag_18x12_en\.png[^>]*>\s*<b>([^<]+)</b>', p_content)
+                if en_word_match:
+                    translation = en_word_match.group(1).strip()
+                    
+                    word_class_match = re.search(r'</b>\s+(\w+)', p_content)
+                    word_class = word_class_match.group(1) if word_class_match else "word"
+                    
+                    translations.append({
+                        "translation": translation,
+                        "class": word_class
+                    })
+        
+        return translations if translations else None
+        
+    except Exception:
+        return None
 
 # -------------------- detection & translation --------------------
 def detect_lang_auto(text):
@@ -243,19 +313,17 @@ def swedish_defs_with_examples(word):
     
     # Try Folkets lexikon as backup
     try:
-        url = f"https://folkets-lexikon.csc.kth.se/folkets/service?word={quote(word)}&lang=sv&output=json"
-        data = fetch_json(url)
+        data = fetch_folkets_lexikon(word, lang="sv")
         
         defs = []
-        if isinstance(data, list) and data:
+        if data and isinstance(data, list):
             for entry in data[:2]:  # Limit to 2 entries
-                if isinstance(entry, dict):
-                    word_class = entry.get("class", "word")
-                    translation = entry.get("translation", "")
-                    
-                    if translation:
-                        short = f"[{word_class}] {translation}"
-                        defs.append(short)
+                word_class = entry.get("class", "word")
+                translation = entry.get("translation", "")
+                
+                if translation:
+                    short = f"[{word_class}] {translation}"
+                    defs.append(short)
         
         if defs:
             return defs
@@ -308,42 +376,23 @@ def english_to_swedish_with_examples(word):
     
     # Try Folkets lexikon for English to Swedish
     try:
-        url = f"https://folkets-lexikon.csc.kth.se/folkets/service?word={quote(word)}&lang=en&output=json"
-        data = fetch_json(url)
+        data = fetch_folkets_lexikon(word, lang="en")
         
         translations = []
-        if isinstance(data, list) and data:
+        if data and isinstance(data, list):
             for entry in data[:2]:  # Limit to 2 entries
-                if isinstance(entry, dict):
-                    word_class = entry.get("class", "word")
-                    translation = entry.get("translation", "")
-                    
-                    if translation:
-                        # Create Swedish example sentence
-                        sv_examples = {
-                            "house": f"{translation} - Ett stort {translation} (A big house)",
-                            "car": f"{translation} - Min {translation} är röd (My car is red)",
-                            "book": f"{translation} - Jag läser en {translation} (I'm reading a book)",
-                            "water": f"{translation} - Jag dricker {translation} (I drink water)",
-                            "food": f"{translation} - Maten är god (The food is good)",
-                            "good": f"{translation} - Det är mycket {translation} (It's very good)",
-                            "big": f"{translation} - En {translation} hund (A big dog)",
-                            "small": f"{translation} - Ett {translation} barn (A small child)",
-                            "love": f"{translation} - Jag {translation} dig (I love you)",
-                            "have": f"{translation} - Jag {translation} en katt (I have a cat)",
-                            "want": f"{translation} - Jag {translation} kaffe (I want coffee)",
-                            "go": f"{translation} - Jag ska {translation} hem (I'm going home)",
-                            "come": f"{translation} - Kan du {translation}? (Can you come?)",
-                            "see": f"{translation} - Jag kan {translation} dig (I can see you)",
-                            "know": f"{translation} - Jag {translation} inte (I don't know)"
-                        }
-                        
-                        example = sv_examples.get(word.lower())
-                        if example:
-                            translations.append(f"[{word_class}] {example}")
-                        else:
-                            # Generic example
-                            translations.append(f"[{word_class}] {translation} (e.g. Jag använder '{translation}' på svenska)")
+                word_class = entry.get("class", "word")
+                translation = entry.get("translation", "")
+                examples = entry.get("examples", [])
+                
+                if translation:
+                    # Use examples from API if available
+                    if examples:
+                        example_text = examples[0] if examples else ""
+                        translations.append(f"[{word_class}] {translation} (e.g. {example_text})")
+                else:
+                    print("no translation from Folkets lexikon")
+
         
         if translations:
             return translations
@@ -444,12 +493,12 @@ def append_tsv(tsv_path: Path, word: str, en_text: str, zh_text: str):
     
     # Check if word already exists
     if word_exists_in_tsv(tsv_path, word):
-        return f"Word '{word}' already exists in {tsv_path.name}\n"
+        return f"{word}\t{en_text}\t{zh_text}\n", True
     
     line = f"{word}\t{en_text}\t{zh_text}\n"
     with tsv_path.open("a", encoding="utf-8") as f:
         f.write(line)
-    return line
+    return line, False
 
 def has_remote():
     try:
@@ -580,19 +629,19 @@ def main():
         zh_text = trans_brief(lang, "zh-CN", term) or ""
         play_audio(term, "en", audio_url=None, enable=not args.no_audio)
 
-    saved = append_tsv(tsv_path, term, en_text, zh_text)
+    line, already_exists = append_tsv(tsv_path, term, en_text, zh_text)
     
     # Only commit if word was actually added (not a duplicate)
-    if not saved.startswith("Word '"):
+    if not already_exists:
         git_commit_push(f"add {term}")
-        print("Saved (TSV):")
-        print(saved, end="")
+        print(line, end="")
     else:
-        print("Skipped (duplicate):")
-        print(saved, end="")
+        print(line, end="")
+        print("(Info: this word has already been added to tsv file.)")
+
     
     print(f"\nFile: {tsv_path}")
-    if AUTO_PUSH and not has_remote():
+    if AUTO_PUSH and not has_remote() and not already_exists:
         print("\n[hint] No git remote set. Add one:\n"
               f'  git -C "{REPO_DIR}" remote add origin <YOUR_GITHUB_URL>\n'
               f'  git -C "{REPO_DIR}" branch -M main && git -C "{REPO_DIR}" push -u origin main')
