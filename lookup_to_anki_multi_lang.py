@@ -431,6 +431,8 @@ def english_to_swedish_with_examples(word):
     return [basic_trans] if basic_trans else ["(no translation found)"]
 
 # -------------------- audio --------------------
+AUDIO_CACHE_DIR = REPO_DIR / ".audio_cache"
+
 def pick_player():
     for p in PREFERRED_PLAYERS:
         exe = which(p)
@@ -445,9 +447,40 @@ def speak_with_espeak(word, lang_code):
     except Exception:
         pass
 
+def get_cached_audio(word, lang_code):
+    """Check if audio file exists in cache"""
+    AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file = AUDIO_CACHE_DIR / f"{lang_code}_{word}.mp3"
+    return cache_file if cache_file.exists() else None
+
+def cache_audio(word, lang_code, audio_url):
+    """Download and cache audio file"""
+    try:
+        AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_file = AUDIO_CACHE_DIR / f"{lang_code}_{word}.mp3"
+        
+        req = urllib.request.Request(audio_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            with cache_file.open("wb") as f:
+                f.write(resp.read())
+        return cache_file
+    except Exception:
+        return None
+
 def play_audio(word, lang_code, audio_url=None, enable=True):
     if not enable:
         return
+    
+    # Check cache first
+    cached_file = get_cached_audio(word, lang_code)
+    if cached_file:
+        audio_url = str(cached_file)
+    elif audio_url:
+        # Download and cache
+        cached = cache_audio(word, lang_code, audio_url)
+        if cached:
+            audio_url = str(cached)
+    
     player = pick_player()
     if audio_url and player in ("mpv", "ffplay", "mpg123"):
         try:
