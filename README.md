@@ -27,7 +27,7 @@ Run: python3 lookup_to_anki_multi_lang.py --lang sv word
 
 # Use on iOS
 export FORVO_API_KEY=c989ec43fa012d74fa8580de97408903
-export PATH="$HOME/anki-vocab:$PATH"
+export PATH="$HOME/anki-vocab.git:$PATH"
 
 e.sh phonetic
 s.sh detalj

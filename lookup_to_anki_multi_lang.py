@@ -387,10 +387,10 @@ def english_to_swedish_with_examples(word):
                 if translation:
                     # Use examples from API if available
                     if examples:
-                        example_text = examples[0] if examples else ""
+                        example_text = examples[0]
                         translations.append(f"[{word_class}] {translation} (e.g. {example_text})")
-                else:
-                    print("no translation from Folkets lexikon")
+                    else:
+                        translations.append(f"[{word_class}] {translation}")
 
         
         if translations:
