@@ -583,6 +583,7 @@ def main():
                     help="Source language code (e.g., auto|en|sv|en2sv|zh|de|fr). Use 'en2sv' to translate English to Swedish. Default: auto")
     ap.add_argument("--no-audio", action="store_true", help="Disable audio playback")
     ap.add_argument("--push", action="store_true", help="Enable git push after adding word")
+    ap.add_argument("--debug", action="store_true", help="Enable debug output")
     args = ap.parse_args()
 
     term = " ".join(args.term).strip()
@@ -686,10 +687,11 @@ def main():
         print(line, end="")
     else:
         print(line, end="")
-        print("(Info: this word has already been added to tsv file.)")
+        if args.debug:
+            print("(Info: this word has already been added to tsv file.)")
 
-    
-    print(f"\nFile: {tsv_path}")
+    if args.debug:
+        print(f"\nFile: {tsv_path}")
     if args.push and not has_remote() and not already_exists:
         print("\n[hint] No git remote set. Add one:\n"
               f'  git -C "{REPO_DIR}" remote add origin <YOUR_GITHUB_URL>\n'
