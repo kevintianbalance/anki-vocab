@@ -440,7 +440,23 @@ def pick_player():
             return Path(exe).name
     return None
 
-def speak_with_espeak(word, lang_code):
+def speak_with_tts(word, lang_code):
+    """Cross-platform TTS: iOS 'say' or Linux 'espeak-ng'"""
+    # Try iOS 'say' command first
+    if which("say"):
+        voices = {
+            "en": "Samantha",
+            "sv": "Alva",
+            "zh": "Ting-Ting"
+        }
+        voice = voices.get(lang_code, "Samantha")
+        try:
+            sh(f'say -v "{voice}" "{word}"', check=False, quiet=True)
+            return
+        except Exception:
+            pass
+    
+    # Fallback to espeak-ng (Linux)
     voice = VOICE_MAP.get(lang_code, DEFAULT_VOICE)
     try:
         sh(f'espeak-ng -v {voice} "{word}"', check=False, quiet=True)
@@ -495,7 +511,7 @@ def play_audio(word, lang_code, audio_url=None, enable=True):
                 return
         except Exception:
             pass
-    speak_with_espeak(word, lang_code)
+    speak_with_tts(word, lang_code)
 
 # -------------------- file & git --------------------
 def ensure_repo():
