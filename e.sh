@@ -1,3 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # English word lookup wrapper
-python3 "$(dirname "$0")/lookup_to_anki_multi_lang.py" --lang en "$@"
+cd ~/anki-vocab
+python3 lookup_to_anki_multi_lang.py --lang en "$@"
