@@ -42,7 +42,6 @@ VOICE_MAP = {
 DEFAULT_VOICE = os.environ.get("ESPEAK_VOICE", "en-us")
 
 TRANS_CMD = os.environ.get("TRANS_CMD", "trans")
-AUTO_PUSH = os.environ.get("VOCAB_GIT_AUTO", "1") == "1"
 HTTP_TIMEOUT = 8
 
 # -------------------- helpers --------------------
@@ -556,11 +555,11 @@ def has_remote():
     except Exception:
         return False
 
-def git_commit_push(message):
+def git_commit_push(message, enable_push=False):
     try:
         sh(f'git -C "{REPO_DIR}" add "{tsv_path.name}"', check=False, quiet=True)
         sh(f'git -C "{REPO_DIR}" commit -m "{message}"', check=False, quiet=True)
-        if AUTO_PUSH and has_remote():
+        if enable_push and has_remote():
             sh(f'git -C "{REPO_DIR}" push', check=False)
     except Exception:
         pass
@@ -583,6 +582,7 @@ def main():
     ap.add_argument("--lang", "-l", default="auto",
                     help="Source language code (e.g., auto|en|sv|en2sv|zh|de|fr). Use 'en2sv' to translate English to Swedish. Default: auto")
     ap.add_argument("--no-audio", action="store_true", help="Disable audio playback")
+    ap.add_argument("--push", action="store_true", help="Enable git push after adding word")
     args = ap.parse_args()
 
     term = " ".join(args.term).strip()
@@ -682,7 +682,7 @@ def main():
     
     # Only commit if word was actually added (not a duplicate)
     if not already_exists:
-        git_commit_push(f"add {term}")
+        git_commit_push(f"add {term}", enable_push=args.push)
         print(line, end="")
     else:
         print(line, end="")
@@ -690,7 +690,7 @@ def main():
 
     
     print(f"\nFile: {tsv_path}")
-    if AUTO_PUSH and not has_remote() and not already_exists:
+    if args.push and not has_remote() and not already_exists:
         print("\n[hint] No git remote set. Add one:\n"
               f'  git -C "{REPO_DIR}" remote add origin <YOUR_GITHUB_URL>\n'
               f'  git -C "{REPO_DIR}" branch -M main && git -C "{REPO_DIR}" push -u origin main')
